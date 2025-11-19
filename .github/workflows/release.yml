@@ -46,6 +46,16 @@ jobs:
           
           # Create tar.gz
           tar czf ${{ matrix.asset_name }}.tar.gz ${{ matrix.asset_name }}
+          
+          # Create nested archives
+          mkdir -p bin
+          cp ${{ matrix.asset_name }} bin/
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            7z a ${{ matrix.asset_name }}-nested.zip bin
+          else
+            zip -r ${{ matrix.asset_name }}-nested.zip bin
+          fi
+          tar czf ${{ matrix.asset_name }}-nested.tar.gz bin
       
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
