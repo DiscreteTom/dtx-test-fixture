@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: dtx-test-fixture
+            asset_name: dtx-test-fixture-linux-x86_64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: dtx-test-fixture.exe
+            asset_name: dtx-test-fixture-windows-x86_64.exe
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+      
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} artifacts/${{ matrix.asset_name }}
+          cd artifacts
+          
+          # Create zip
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            7z a ${{ matrix.asset_name }}.zip ${{ matrix.asset_name }}
+          else
+            zip ${{ matrix.asset_name }}.zip ${{ matrix.asset_name }}
+          fi
+          
+          # Create tar.gz
+          tar czf ${{ matrix.asset_name }}.tar.gz ${{ matrix.asset_name }}
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: artifacts/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/*
+          draft: false
+          prerelease: false
